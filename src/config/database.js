@@ -1,52 +1,25 @@
-// ============================================================
-// src/config/database.js
-// Conexión Sequelize + PostgreSQL
-// En producción (Vercel + Neon) usa DATABASE_URL
-// En local usa las variables separadas del .env
-// ============================================================
+import Sequelize from 'sequelize'
+import pg from 'pg'
 
-import { Sequelize } from 'sequelize';
-import dotenv        from 'dotenv';
+// Si existe DATABASE_URL (ej. Neon/Vercel) se usa ese connection string con SSL;
+// si no, se conecta al Postgres local de desarrollo.
 
-dotenv.config();
+const url = process.env.DATABASE_URL || ''
 
-// El profe usa DATABASE_URL (cadena de conexión de Neon)
-// Igual que en la guía de Vercel que dio en clase
-const url = process.env.DATABASE_URL || '';
-
-let sequelize;
-
-if (url) {
-  // Producción: Neon entrega una sola DATABASE_URL
-  sequelize = new Sequelize(url, {
-    dialect:        'postgres',
-    logging:        false,
-    dialectOptions: {
-      ssl: {
-        require:            true,
-        rejectUnauthorized: false,
-      },
-    },
-  });
-} else {
-  // Local: variables separadas del .env
-  sequelize = new Sequelize(
-    process.env.DB_NAME,
-    process.env.DB_USERNAME,
-    process.env.DB_PASSWORD,
-    {
-      host:    process.env.DB_HOST,
-      port:    parseInt(process.env.DB_PORT) || 5432,
-      dialect: 'postgres',
-      logging: false,
-      dialectOptions: {
-        ssl: {
-          require:            true,
-          rejectUnauthorized: false,
+const sequelize = url
+    ? new Sequelize(url, {
+        dialect: 'postgres',
+        dialectModule: pg,
+        dialectOptions: {
+            ssl: { require: true, rejectUnauthorized: false }
         },
-      },
-    }
-  );
-}
+        pool: { max: 2 }
+    })
+    : new Sequelize('ulima_eventos', 'postgres', '1234', {
+        host: 'localhost',
+        port: 5432,
+        dialect: 'postgres',
+        dialectModule: pg
+    });
 
-export { sequelize };
+export default sequelize;

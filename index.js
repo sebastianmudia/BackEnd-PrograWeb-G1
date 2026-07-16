@@ -1,38 +1,56 @@
-// ============================================================
-// index.js — Punto de entrada del servidor
-// Conecta a PostgreSQL y luego levanta Express
-// Compatible con Vercel (exporta app) y local (app.listen)
-// ============================================================
+import app from './app.js'
+import sequelize from './src/config/database.js'
 
-import dotenv      from 'dotenv';
-import app         from './src/app.js';
-import { sequelize } from './src/config/database.js';
-import './src/models/index.js';
+// Validar conexión a la base de datos (solo para Vercel)
+let dbConnected = false;
 
-dotenv.config();
-
-const PORT = process.env.PORT || 3005;
-
-async function iniciar() {
-  try {
-    await sequelize.authenticate();
-    console.log('Conexión a PostgreSQL establecida.');
-    await sequelize.sync();
-    console.log('Tablas sincronizadas.');
-    app.listen(PORT, () => {
-      console.log(`API escuchando en http://localhost:${PORT}`);
-    });
-  } catch (error) {
-    console.error('No se pudo conectar a la base de datos:', error);
-    process.exit(1);
-  }
+async function ensureDatabaseConnection() {
+    if (!dbConnected) {
+        try {
+            await sequelize.authenticate();
+            console.log('Conexión a la base de datos establecida correctamente');
+            dbConnected = true;
+        } catch (error) {
+            console.error('Error conectando a la base de datos:', error);
+            throw error;
+        }
+    }
 }
 
-// En Vercel exporta la app; en local inicia el servidor
+async function main() {
+    try {
+        const init = process.argv[2];
+
+        if (init)
+            await sequelize.sync({ force: true })
+        else
+            await sequelize.sync({ force: false })
+
+        console.log('Base de datos sincronizada!')
+
+        const port = process.env.PORT || 3005;
+
+        app.listen(port, () => {
+        console.log(`Server is running on port ${port}.`);
+        });
+
+
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+// Detectar si estamos en Vercel o desarrollo local
 if (process.env.VERCEL) {
-  iniciar().catch(console.error);
+    // En Vercel, solo validar conexión (no sincronizar esquema)
+    app.use(async (req, res, next) => {
+        await ensureDatabaseConnection();
+        next();
+    });
 } else {
-  iniciar();
+    // En local, ejecutar el servidor normalmente
+    main();
 }
 
+// Exportar para Vercel
 export default app;
